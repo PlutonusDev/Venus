@@ -7,7 +7,8 @@ module.exports = class Venus {
 	constructor(logger) {
 		this.logger = logger;
 		this.handlers = {
-			addToken: require("./handlers/addToken")(this.logger)
+			token: require("./handlers/token")(this.logger),
+			raid: require("./handlers/raid")(this, this.logger)
 		}
 	}
 
@@ -37,8 +38,7 @@ module.exports = class Venus {
 				},
 				{
 					name: "    Add Multiple Tokens from File",
-					value: "multiple",
-					disabled: "I haven't added this yet"
+					value: "multiple"
 				},
 				{
 					name: "    Check Tokens",
@@ -46,8 +46,7 @@ module.exports = class Venus {
 				},
 				{
 					name: "    Start a Raid",
-					value: "raid",
-					disabled: "I haven't added this yet"
+					value: "raid"
 				},
 				{
 					name: "    Exit",
@@ -60,19 +59,19 @@ module.exports = class Venus {
 			this.splash();
 			switch(resp.opt) {
 				case "single":
-					await this.handlers.addToken.single();
+					await this.handlers.token.addSingle();
 					break;
 
 				case "multiple":
-					await this.handlers.addToken.multiple();
+					await this.handlers.token.addMultiple();
 					break;
 
 				case "check":
-					await this.handlers.addToken.check();
+					await this.handlers.token.check();
 					break;
 
 				case "raid":
-					console.log("raid");
+					await this.handlers.raid.loop();
 					break;
 
 				case "exit":

@@ -1,15 +1,17 @@
 const inquirer = require("inquirer");
 const chalk = require("chalk");
 const table = require("cli-table");
+const readlines = require("n-readlines");
 const { checkToken, insertToken, deleteToken, getAllTokens } = require("../util/database");
 const { checkAccount } = require("../util/discord");
 const wait = require("util").promisify(setTimeout);
+inquirer.registerPrompt("file-tree", require("inquirer-file-tree-selection-prompt"));
 
 const tokenReg = /[MN][A-Za-z\d]{23}\.[\w-]{6}\.[\w-]{27}/;
 
 module.exports = logger => {
 	return {
-		single: () => {
+		addSingle: () => {
 			return new Promise((res, rej) => {
 				logger.log(`Type ${chalk.cyan("exit")} to return to the menu.\n`);
 				inquirer.prompt([
@@ -34,9 +36,35 @@ module.exports = logger => {
 			});
 		},
 
-		multiple: () => {
+		addMultiple: () => {
 			return new Promise((res, rej) => {
-				res();
+				logger.log(`These should be files in ${chalk.cyan("./src/data/tokens/")} with a token per line.\n`);
+				inquirer.prompt([
+					{
+						name: "file",
+						type: "file-tree",
+						message: "    Choose a file to add tokens from:",
+						extensions: ["txt"],
+						root: "./src/data/tokens/"
+					}
+				]).then(async resp => {
+					let liner = new readlines(resp.file);
+					let next;
+					let tokens = 0;
+					let valid = 0;
+					while(next = liner.next()) {
+						tokens++;
+						if(checkToken(next.toString())) continue;
+						if(!next.toString().match(tokenReg)) continue;
+						valid++;
+						insertToken(next.toString());
+					}
+					console.log();
+					logger.ok(`Added ${chalk.cyan(valid)} of ${chalk.cyan(tokens)} tokens from file. ${chalk.red(tokens-valid)} tokens were invalid.`);
+					await wait(4000);
+
+					res();
+				});
 			});
 		},
 
@@ -50,13 +78,13 @@ module.exports = logger => {
 				let invalid = [];
 				let output = new table({
 					head: ["Token", "Valid", "Name", "ID", "Created"],
-					colWidths: [30, 9, 20, 20, 20]
+					colWidths: [30, 9, 28, 20, 20]
 				});
 				tokens.forEach(token => {
 					promises.push(new Promise(async (res, rej) => {
-						let data = await checkAccount(token.entry);
-						if(!data) {
-							output.push([token.entry, chalk.red("No"), "N/A", "N/A", "N/A"]);
+						let data = await checkAccount(token.entry.replace("\r",""));
+						if(!data || (data && data.type=="bot")) {
+							output.push([token.entry, data && data.type=="bot" ? chalk.red("Bot Acc") : chalk.red("No"), data ? data.tag : "N/A", data ? data.id : "N/A", data ? data.created : "N/A"]);
 							invalid.push(token.entry);
 							/*output.push({
 								token: token.entry,
@@ -93,7 +121,7 @@ module.exports = logger => {
 					{
 						name: "remove",
 						type: "confirm",
-						message: "Would you like to remove all invalid tokens from the database?",
+						message: `Would you like to ${chalk.red("remove all invalid tokens")} from the database?`,
 						prefix: "    "
 					}
 				]).then(async resp => {
